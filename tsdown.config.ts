@@ -17,6 +17,7 @@ export default defineConfig((cli) => {
       'tsc-worker': './src/tsc/worker.ts',
     },
     platform: 'node',
+    // Disable tsdown's built-in dts integration so we can dogfood the local plugin in `plugins` below.
     dts: false,
     define: {
       'import.meta.WORKER_URL': JSON.stringify('./tsc-worker.mjs'),
@@ -29,7 +30,20 @@ export default defineConfig((cli) => {
     treeshake: {
       moduleSideEffects: false,
     },
-    exports: true,
+    exports: {
+      // tsdown's built-in exports generator does not emit `types` conditions by default.
+      customExports(exports) {
+        for (const [key, value] of Object.entries(exports)) {
+          if (key !== './package.json' && typeof value === 'string') {
+            exports[key] = {
+              types: value.replace(/\.mjs$/, '.d.mts'),
+              default: value,
+            }
+          }
+        }
+        return exports
+      },
+    },
     plugins: [
       dts({
         generator: 'oxc',
